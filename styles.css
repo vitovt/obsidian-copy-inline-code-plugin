@@ -2,6 +2,15 @@
 	cursor: pointer;
 }
 
+.copy-to-clipboard-icon svg {
+	vertical-align: text-bottom;
+	pointer-events: none;
+}
+
+.icon-margin-left {
+	margin-left: 0.25em;
+}
+
 .show-on-hover {
 	cursor: pointer;
 	opacity: 0;
@@ -23,4 +32,22 @@ code:hover .show-on-hover {
 
 .regex-input-error {
 	border-color: var(--text-error) !important;
+}
+
+.icon-input-container {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.preview-icon {
+	color: var(--text-normal);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.invalid-preview-icon {
+	color: var(--text-error) !important;
 }

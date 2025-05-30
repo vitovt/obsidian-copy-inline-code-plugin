@@ -1,6 +1,6 @@
 # Obsidian Copy Inline Code Plugin
 
-This plugin for [Obsidian](https://obsidian.md) adds an icon inside each inline code, which when clicked, copies the content of the code into the clipboard. See screenshot of the functionality below.
+This plugin for [Obsidian](https://obsidian.md) adds a customizable icon inside each inline code, which when clicked, copies the content of the code into the clipboard. See screenshot of the functionality below.
 
 ![Screenshot of the copy inline code plugin](plugin-screenshot.png)
 

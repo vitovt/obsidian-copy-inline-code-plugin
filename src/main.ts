@@ -1,16 +1,20 @@
 import { CopyInlineCodePluginTab } from "./settings";
-import { Notice, Plugin } from "obsidian";
+import { Notice, Plugin, getIcon } from "obsidian";
 import { createCopyPlugin } from "./copy-inline-code-view-plugin";
 import { RegexFilters, shouldExclude } from "./regex-exclude";
 
 interface CopyInlineCodePluginSettings {
 	showOnHover: boolean;
 	regexFilters: RegexFilters;
+	iconName: string;
+	useLegacyIcon: boolean;
 }
 
 const DEFAULT_SETTINGS: Partial<CopyInlineCodePluginSettings> = {
 	showOnHover: false,
 	regexFilters: [],
+	iconName: "lucide-copy",
+	useLegacyIcon: false,
 };
 
 export default class CopyInlineCodePlugin extends Plugin {
@@ -38,7 +42,9 @@ export default class CopyInlineCodePlugin extends Plugin {
 		this.registerEditorExtension([
 			createCopyPlugin(
 				this.settings.showOnHover,
-				this.settings.regexFilters
+				this.settings.regexFilters,
+				this.settings.iconName,
+				this.settings.useLegacyIcon
 			),
 		]);
 		this.registerMarkdownPostProcessor((element, context) => {
@@ -59,9 +65,20 @@ export default class CopyInlineCodePlugin extends Plugin {
 				}
 
 				const icon = createSpan({
-					cls: "copy-to-clipboard-icon",
-					text: "\xa0📋",
+					cls: "copy-to-clipboard-icon icon-margin-left",
 				});
+
+				if (this.settings.useLegacyIcon) {
+					icon.setText("\xa0📋");
+				} else {
+					const lucideIcon = getIcon(this.settings.iconName);
+					if (lucideIcon) {
+						icon.appendChild(lucideIcon);
+					} else {
+						icon.setText("\xa0📋");
+					}
+				}
+
 				icon.toggleClass("show-on-hover", this.settings.showOnHover);
 
 				icon.onclick = (event) => {

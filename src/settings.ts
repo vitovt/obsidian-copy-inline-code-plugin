@@ -1,5 +1,5 @@
 import CopyInlineCodePlugin from "./main";
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, getIconIds, getIcon } from "obsidian";
 
 export class CopyInlineCodePluginTab extends PluginSettingTab {
 	plugin: CopyInlineCodePlugin;
@@ -15,7 +15,7 @@ export class CopyInlineCodePluginTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.createEl("p", {
 			cls: "tasks-setting-important",
-			text: "Changing any settings requires a restart of obsidian.",
+			text: "Changing any settings requires a restart of obsidian or use of the 'Reload app without saving' command.",
 		});
 
 		new Setting(containerEl)
@@ -46,6 +46,122 @@ export class CopyInlineCodePluginTab extends PluginSettingTab {
 				this.renderRegexList(regexListContainer);
 			});
 		});
+
+		// Icon selection setting
+		containerEl.createEl("h3", { text: "Icon Settings" });
+
+		// Only show Lucide icon settings if legacy mode is disabled
+		if (!this.plugin.settings.useLegacyIcon) {
+			const iconDesc = containerEl.createDiv();
+			iconDesc.createEl("p", {
+				text: "Choose a Lucide icon for the copy button. You can browse available icons at: ",
+			});
+			const iconLink = iconDesc.createEl("a", {
+				text: "https://lucide.dev/icons/",
+				href: "https://lucide.dev/icons/",
+			});
+			iconLink.setAttribute("target", "_blank");
+
+			iconDesc.createEl("p", {
+				text: "Copy the icon name (e.g., 'copy', 'clipboard', ...) and paste it below.",
+			});
+
+			const iconSetting = new Setting(containerEl)
+				.setName("Icon name")
+				.setDesc(
+					"Lucide icon name"
+				);
+
+			// Create a container for the input and preview
+			const inputContainer = iconSetting.controlEl.createDiv({
+				cls: "icon-input-container",
+			});
+
+			// Create preview element
+			const iconPreview = inputContainer.createSpan();
+
+			// Function to update the icon preview
+			const updateIconPreview = (iconName: string) => {
+				iconPreview.empty();
+
+				let lucideIcon: SVGSVGElement | null = null;
+				let isInvalid = false;
+
+				if (!iconName) {
+					isInvalid = true;
+					lucideIcon = getIcon("lucide-x");
+				} else {
+					lucideIcon = getIcon(iconName);
+					if (!lucideIcon) {
+						isInvalid = true;
+						lucideIcon = getIcon("lucide-x");
+					}
+				}
+
+				if (lucideIcon) {
+					lucideIcon.classList.add("preview-icon");
+					if (isInvalid) {
+						lucideIcon.classList.add("invalid-preview-icon");
+					}
+					iconPreview.appendChild(lucideIcon);
+				}
+			};
+
+			// Create text input
+			const textInput = inputContainer.createEl("input", {
+				type: "text",
+				cls: "text-input",
+			});
+			textInput.style.flex = "1";
+			textInput.placeholder = "copy";
+
+			// Get the base icon name (without lucide- prefix) for display
+			const baseIconName = this.plugin.settings.iconName.startsWith(
+				"lucide-"
+			)
+				? this.plugin.settings.iconName.substring(7)
+				: this.plugin.settings.iconName;
+
+			textInput.value = baseIconName;
+
+			// Initialize preview with current icon
+			updateIconPreview(this.plugin.settings.iconName);
+
+			textInput.addEventListener("input", async (event) => {
+				const target = event.target as HTMLInputElement;
+				const value = target.value;
+				const trimmedValue = `lucide-${value.trim()}`;
+				const availableIcons = getIconIds();
+
+				// Update preview in real-time
+				updateIconPreview(trimmedValue);
+
+				// Validate icon exists
+				if (trimmedValue && !availableIcons.includes(trimmedValue)) {
+					textInput.classList.add("regex-input-error");
+					return;
+				}
+
+				textInput.classList.remove("regex-input-error");
+				this.plugin.settings.iconName = trimmedValue;
+				await this.plugin.saveSettings();
+			});
+		}
+
+		new Setting(containerEl)
+			.setName("Use legacy icon")
+			.setDesc(
+				"Use the original clipboard emoji (📋) instead of Lucide icons"
+			)
+			.addToggle((component) => {
+				component
+					.setValue(this.plugin.settings.useLegacyIcon)
+					.onChange(async (value) => {
+						this.plugin.settings.useLegacyIcon = value;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
 	}
 
 	private renderRegexList(container: HTMLElement) {
