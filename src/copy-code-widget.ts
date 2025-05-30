@@ -1,15 +1,31 @@
 import { EditorView, WidgetType } from "@codemirror/view";
-import { Notice } from "obsidian";
+import { Notice, getIcon } from "obsidian";
 
 export class CopyWidget extends WidgetType {
   showOnHover: boolean;
-  constructor(showOnHover: boolean) { 
+  iconName: string;
+  useLegacyIcon: boolean;
+  constructor(showOnHover: boolean, iconName: string, useLegacyIcon: boolean) { 
     super();
     this.showOnHover = showOnHover;
+    this.iconName = iconName;
+    this.useLegacyIcon = useLegacyIcon;
   }
 
   toDOM(view: EditorView): HTMLElement {
-    const icon = createSpan({cls:  "copy-to-clipboard-icon", text: "\xa0📋"})
+    const icon = createSpan({cls:  "copy-to-clipboard-icon"});
+    
+    if (this.useLegacyIcon) {
+      icon.setText("\xa0📋");
+    } else {
+      const lucideIcon = getIcon(this.iconName);
+      if (lucideIcon) {
+        icon.appendChild(lucideIcon);
+      } else {
+        icon.setText("\xa0📋");
+      }
+    }
+    
     icon.toggleClass("show-on-hover", this.showOnHover)
     icon.onclick = (event) => {
         const element = (event.target as HTMLElement)
