@@ -1,10 +1,25 @@
-# Obsidian Copy Inline Code Plugin
+> This repository is an **improved COPY** of the original plugin with the following improvements:
 
 ## Changes in This Fork
 
 - **No extra spacing on hover:** Enabling **Show on hover** no longer reserves space for hidden copy icons or changes line length or line height when they appear.
 - **Clean printing and PDF export:** Copy icons are excluded from printed documents and exported PDFs.
 - **Immediate settings:** Plugin settings apply to open editor and Reading Mode views without restarting Obsidian.
+
+> It was created because original plugin has a lot of opened issues and **author doesn't respond**.
+
+## 🔌 Installation via BRAT
+
+You can install the latest beta version of this plugin using [Obsidian BRAT Plugin](https://community.obsidian.md/plugins/obsidian42-brat):
+
+1. Open **Obsidian Settings** and go to **BRAT**.
+2. Click **Add Beta plugin**.
+3. Paste this repository URL: `https://github.com/vitovt/obsidian-copy-inline-code-plugin/`
+4. Click **Add Plugin** and enable it under **Community plugins**.
+
+---
+
+# Obsidian Copy Inline Code Plugin
 
 This plugin for [Obsidian](https://obsidian.md) adds a customizable icon inside each inline code, which when clicked, copies the content of the code into the clipboard. See screenshot of the functionality below.
 
