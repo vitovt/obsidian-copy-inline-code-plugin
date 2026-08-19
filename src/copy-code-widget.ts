@@ -28,7 +28,7 @@ export class CopyWidget extends WidgetType {
     
     icon.toggleClass("show-on-hover", this.showOnHover)
     icon.onclick = (event) => {
-        const element = (event.target as HTMLElement)
+        const element = (event.currentTarget as HTMLElement)
         let previousElement = element.previousElementSibling
         while(previousElement && !previousElement.matches('.cm-inline-code:not(.cm-formatting)')) {
           previousElement = previousElement.previousElementSibling

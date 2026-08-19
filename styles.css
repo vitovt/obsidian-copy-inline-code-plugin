@@ -13,16 +13,37 @@
 
 .show-on-hover {
 	cursor: pointer;
+	/* Use a zero-width anchor so revealing the widget cannot reflow text. */
+	display: inline-flex;
+	position: relative;
+	width: 0;
+	margin-left: 0;
+	justify-content: flex-end;
+	overflow: visible;
+	z-index: 1;
+	vertical-align: text-bottom;
 	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+.show-on-hover > svg {
+	flex: 0 0 auto;
+	background-color: var(--code-background);
+	pointer-events: auto;
 }
 
 /* Source Mode */
 .cm-line:hover .show-on-hover {
 	opacity: 1;
+	visibility: visible;
+	pointer-events: auto;
 }
 /* Reading Mode */
 code:hover .show-on-hover {
 	opacity: 1;
+	visibility: visible;
+	pointer-events: auto;
 }
 
 .tasks-setting-important {
