@@ -71,106 +71,310 @@ localbuild: check
 	printf 'Local test build: %s\n' "$(abspath $(LOCAL_BUILD_DIR))"
 
 release-check:
-	@required_files=(manifest.json styles.css package.json package-lock.json versions.json src/main.ts make_release.sh)
+	@passes=0
+	failures=0
+	skips=0
+	have_git=false
+	have_gh=false
+	have_node=false
+	have_npm=false
+	gh_authenticated=false
+	version=''
+	package_version=''
+	lock_version=''
+	lock_root_version=''
+	min_app_version=''
+	versions_min_app=''
+	release_notes=''
+	head_commit=''
+	repository=''
+	pass() {
+		passes=$$((passes + 1))
+		printf '[OK]   %s\n' "$$1"
+	}
+	fail() {
+		failures=$$((failures + 1))
+		printf '[FAIL] %s\n' "$$1" >&2
+	}
+	skip() {
+		skips=$$((skips + 1))
+		printf '[SKIP] %s\n' "$$1"
+	}
+
+	printf 'Release readiness checks\n\n'
+
+	required_files=(manifest.json styles.css package.json package-lock.json versions.json src/main.ts make_release.sh)
 	for required_file in "$${required_files[@]}"; do
-		if [[ ! -s "$$required_file" ]]; then
-			printf 'Error: required file %s is missing or empty.\n' "$$required_file" >&2
-			exit 1
+		if [[ -s "$$required_file" ]]; then
+			pass "Required file $$required_file is present"
+		else
+			fail "Required file $$required_file is missing or empty"
 		fi
 	done
 
 	for required_command in git gh node npm; do
-		if ! command -v "$$required_command" >/dev/null 2>&1; then
-			printf 'Error: required command %s is unavailable.\n' "$$required_command" >&2
-			exit 1
+		if command -v "$$required_command" >/dev/null 2>&1; then
+			pass "Required command $$required_command is available"
+			case "$$required_command" in
+				git) have_git=true ;;
+				gh) have_gh=true ;;
+				node) have_node=true ;;
+				npm) have_npm=true ;;
+			esac
+		else
+			fail "Required command $$required_command is unavailable"
 		fi
 	done
 
-	version="$$(node -p "require('./manifest.json').version")"
-	package_version="$$(node -p "require('./package.json').version")"
-	lock_version="$$(node -p "require('./package-lock.json').version")"
-	lock_root_version="$$(node -p "require('./package-lock.json').packages[''].version")"
-	min_app_version="$$(node -p "require('./manifest.json').minAppVersion")"
-	versions_min_app="$$(node -p "require('./versions.json')['$$version'] || ''")"
-	release_notes="release-notes/$$version.md"
-
-	if [[ "$${package_version}" != "$$version" || "$${lock_version}" != "$$version" || "$${lock_root_version}" != "$$version" ]]; then
-		printf 'Error: manifest, package, and lockfile versions must all equal %s.\n' "$$version" >&2
-		exit 1
-	fi
-	if [[ "$${versions_min_app}" != "$$min_app_version" ]]; then
-		printf 'Error: versions.json does not map %s to minAppVersion %s.\n' "$$version" "$$min_app_version" >&2
-		exit 1
-	fi
-	if [[ ! -s "$$release_notes" ]]; then
-		printf 'Error: release description %s is missing or empty.\n' "$$release_notes" >&2
-		exit 1
+	if $$have_node && [[ -s manifest.json ]]; then
+		if version="$$(node -p "require('./manifest.json').version" 2>/dev/null)" && [[ -n "$$version" && "$$version" != 'undefined' ]]; then
+			pass "Read plugin version $$version from manifest.json"
+		else
+			version=''
+			fail 'Could not read the plugin version from manifest.json'
+		fi
+		if min_app_version="$$(node -p "require('./manifest.json').minAppVersion" 2>/dev/null)" && [[ -n "$$min_app_version" && "$$min_app_version" != 'undefined' ]]; then
+			pass "Read minimum Obsidian version $$min_app_version"
+		else
+			min_app_version=''
+			fail 'Could not read minAppVersion from manifest.json'
+		fi
+	else
+		skip 'Manifest metadata checks require node and manifest.json'
 	fi
 
-	branch="$$(git branch --show-current)"
-	if [[ "$$branch" != "main" ]]; then
-		printf 'Error: releases must be made from main, not %s.\n' "$${branch:-detached HEAD}" >&2
-		exit 1
-	fi
-	if [[ -n "$$(git status --porcelain --untracked-files=all)" ]]; then
-		printf '%s\n' 'Error: the Git working tree must be clean before release.' >&2
-		git status --short >&2
-		exit 1
-	fi
-
-	head_commit="$$(git rev-parse HEAD)"
-	tag_commit="$$(git rev-list -n 1 "$$version" 2>/dev/null || true)"
-	if [[ "$$tag_commit" != "$$head_commit" ]]; then
-		printf 'Error: tag %s must point to HEAD %s.\n' "$$version" "$$head_commit" >&2
-		exit 1
+	if $$have_node && [[ -s package.json ]]; then
+		if package_version="$$(node -p "require('./package.json').version" 2>/dev/null)" && [[ -n "$$package_version" && "$$package_version" != 'undefined' ]]; then
+			pass "Read package version $$package_version"
+		else
+			package_version=''
+			fail 'Could not read the version from package.json'
+		fi
+	else
+		skip 'package.json metadata check requires node and package.json'
 	fi
 
-	origin_url="$$(git remote get-url origin 2>/dev/null || true)"
-	case "$$origin_url" in
-		git@github.com:*) repository="$${origin_url#git@github.com:}" ;;
-		ssh://git@github.com/*) repository="$${origin_url#ssh://git@github.com/}" ;;
-		https://github.com/*) repository="$${origin_url#https://github.com/}" ;;
-		http://github.com/*) repository="$${origin_url#http://github.com/}" ;;
-		*) printf 'Error: origin is not a supported GitHub URL: %s\n' "$$origin_url" >&2; exit 1 ;;
-	esac
-	repository="$${repository%.git}"
-	if [[ ! "$$repository" =~ ^[^/]+/[^/]+$$ ]]; then
-		printf 'Error: could not determine owner/repository from origin: %s\n' "$$origin_url" >&2
-		exit 1
+	if $$have_node && [[ -s package-lock.json ]]; then
+		if lock_version="$$(node -p "require('./package-lock.json').version" 2>/dev/null)" && [[ -n "$$lock_version" && "$$lock_version" != 'undefined' ]]; then
+			pass "Read lockfile version $$lock_version"
+		else
+			lock_version=''
+			fail 'Could not read the top-level version from package-lock.json'
+		fi
+		if lock_root_version="$$(node -p "require('./package-lock.json').packages[''].version" 2>/dev/null)" && [[ -n "$$lock_root_version" && "$$lock_root_version" != 'undefined' ]]; then
+			pass "Read lockfile root package version $$lock_root_version"
+		else
+			lock_root_version=''
+			fail 'Could not read the root package version from package-lock.json'
+		fi
+	else
+		skip 'Lockfile metadata checks require node and package-lock.json'
 	fi
 
-	gh auth status --hostname github.com >/dev/null
-	remote_main="$$(git ls-remote origin refs/heads/main | awk 'NR == 1 { print $$1 }')"
-	if [[ "$$remote_main" != "$$head_commit" ]]; then
-		printf 'Error: origin/main does not point to HEAD. Push main before release.\n' >&2
-		exit 1
-	fi
-	remote_tag="$$(git ls-remote origin "refs/tags/$$version^{}" | awk 'NR == 1 { print $$1 }')"
-	if [[ -z "$$remote_tag" ]]; then
-		remote_tag="$$(git ls-remote origin "refs/tags/$$version" | awk 'NR == 1 { print $$1 }')"
-	fi
-	if [[ "$$remote_tag" != "$$head_commit" ]]; then
-		printf 'Error: remote tag %s does not point to HEAD. Push the tag before release.\n' "$$version" >&2
-		exit 1
-	fi
-	if gh release view "$$version" --repo "$$repository" >/dev/null 2>&1; then
-		printf 'Error: GitHub release %s already exists in %s.\n' "$$version" "$$repository" >&2
-		exit 1
+	if [[ -n "$$version" && -n "$$package_version" && -n "$$lock_version" && -n "$$lock_root_version" ]]; then
+		if [[ "$$package_version" == "$$version" && "$$lock_version" == "$$version" && "$$lock_root_version" == "$$version" ]]; then
+			pass "Manifest, package, and lockfile versions all equal $$version"
+		else
+			fail "Version mismatch: manifest=$$version package=$$package_version lock=$$lock_version lock-root=$$lock_root_version"
+		fi
+	else
+		skip 'Version alignment check requires all version metadata'
 	fi
 
-	$(NPM) ci
-	$(NPM) run lint
-	$(NPM) run build
+	if $$have_node && [[ -s versions.json && -n "$$version" ]]; then
+		if versions_min_app="$$(node -p "require('./versions.json')['$$version'] || ''" 2>/dev/null)"; then
+			if [[ -n "$$min_app_version" && "$$versions_min_app" == "$$min_app_version" ]]; then
+				pass "versions.json maps $$version to minAppVersion $$min_app_version"
+			else
+				fail "versions.json maps $$version to '$$versions_min_app', expected '$$min_app_version'"
+			fi
+		else
+			fail 'Could not read versions.json'
+		fi
+	else
+		skip 'versions.json mapping check requires node, versions.json, and a plugin version'
+	fi
+
+	if [[ -n "$$version" ]]; then
+		release_notes="release-notes/$$version.md"
+		if [[ -s "$$release_notes" ]]; then
+			pass "Release description $$release_notes is present"
+		else
+			fail "Release description $$release_notes is missing or empty"
+		fi
+	else
+		skip 'Release description check requires a plugin version'
+	fi
+
+	if $$have_git; then
+		if branch="$$(git branch --show-current 2>/dev/null)"; then
+			if [[ "$$branch" == 'main' ]]; then
+				pass 'Current branch is main'
+			else
+				fail "Releases must be made from main, not $${branch:-detached HEAD}"
+			fi
+		else
+			fail 'Could not determine the current Git branch'
+		fi
+
+		if git_status="$$(git status --porcelain --untracked-files=all 2>/dev/null)"; then
+			if [[ -z "$$git_status" ]]; then
+				pass 'Git working tree is clean'
+			else
+				fail 'Git working tree is not clean'
+				printf '%s\n' "$$git_status" >&2
+			fi
+		else
+			fail 'Could not inspect the Git working tree'
+		fi
+
+		if head_commit="$$(git rev-parse HEAD 2>/dev/null)"; then
+			pass "Read HEAD commit $$head_commit"
+		else
+			head_commit=''
+			fail 'Could not resolve HEAD'
+		fi
+
+		if [[ -n "$$version" && -n "$$head_commit" ]]; then
+			if tag_commit="$$(git rev-list -n 1 "$$version" 2>/dev/null)" && [[ "$$tag_commit" == "$$head_commit" ]]; then
+				pass "Local tag $$version points to HEAD"
+			else
+				fail "Local tag $$version must point to HEAD $$head_commit"
+			fi
+		else
+			skip 'Local tag check requires a plugin version and HEAD commit'
+		fi
+
+		if origin_url="$$(git remote get-url origin 2>/dev/null)"; then
+			case "$$origin_url" in
+				git@github.com:*) repository="$${origin_url#git@github.com:}" ;;
+				ssh://git@github.com/*) repository="$${origin_url#ssh://git@github.com/}" ;;
+				https://github.com/*) repository="$${origin_url#https://github.com/}" ;;
+				http://github.com/*) repository="$${origin_url#http://github.com/}" ;;
+				*) repository='' ;;
+			esac
+			repository="$${repository%.git}"
+			if [[ "$$repository" =~ ^[^/]+/[^/]+$$ ]]; then
+				pass "Origin identifies GitHub repository $$repository"
+			else
+				repository=''
+				fail "Origin is not a supported GitHub repository URL: $$origin_url"
+			fi
+		else
+			fail 'Could not read the origin remote URL'
+		fi
+	else
+		skip 'Git repository checks require git'
+	fi
+
+	if $$have_gh; then
+		if gh auth status --hostname github.com >/dev/null 2>&1; then
+			gh_authenticated=true
+			pass 'GitHub CLI is authenticated for github.com'
+		else
+			fail 'GitHub CLI is not authenticated for github.com'
+		fi
+	else
+		skip 'GitHub authentication check requires gh'
+	fi
+
+	if $$have_git && [[ -n "$$head_commit" ]]; then
+		if remote_main_output="$$(git ls-remote origin refs/heads/main 2>/dev/null)"; then
+			remote_main="$$(awk 'NR == 1 { print $$1 }' <<<"$$remote_main_output")"
+			if [[ "$$remote_main" == "$$head_commit" ]]; then
+				pass 'origin/main points to HEAD'
+			else
+				fail "origin/main does not point to HEAD $$head_commit"
+			fi
+		else
+			fail 'Could not query origin/main'
+		fi
+	else
+		skip 'Remote main check requires git and a HEAD commit'
+	fi
+
+	if $$have_git && [[ -n "$$version" && -n "$$head_commit" ]]; then
+		remote_tag=''
+		remote_tag_query_ok=true
+		if remote_tag_output="$$(git ls-remote origin "refs/tags/$$version^{}" 2>/dev/null)"; then
+			remote_tag="$$(awk 'NR == 1 { print $$1 }' <<<"$$remote_tag_output")"
+		else
+			remote_tag_query_ok=false
+		fi
+		if [[ -z "$$remote_tag" ]]; then
+			if remote_tag_output="$$(git ls-remote origin "refs/tags/$$version" 2>/dev/null)"; then
+				remote_tag="$$(awk 'NR == 1 { print $$1 }' <<<"$$remote_tag_output")"
+			else
+				remote_tag_query_ok=false
+			fi
+		fi
+		if ! $$remote_tag_query_ok; then
+			fail "Could not query remote tag $$version"
+		elif [[ "$$remote_tag" == "$$head_commit" ]]; then
+			pass "Remote tag $$version points to HEAD"
+		else
+			fail "Remote tag $$version does not point to HEAD $$head_commit"
+		fi
+	else
+		skip 'Remote tag check requires git, a plugin version, and a HEAD commit'
+	fi
+
+	if $$have_gh && $$gh_authenticated && [[ -n "$$repository" && -n "$$version" ]]; then
+		if gh release view "$$version" --repo "$$repository" >/dev/null 2>&1; then
+			fail "GitHub release $$version already exists in $$repository"
+		else
+			pass "GitHub release $$version does not exist in $$repository"
+		fi
+	else
+		skip 'Existing release check requires authenticated gh, a repository, and a plugin version'
+	fi
+
+	if $$have_npm; then
+		printf '\n[RUN]  npm ci\n'
+		if $(NPM) ci; then
+			pass 'npm ci completed successfully'
+		else
+			fail 'npm ci failed'
+		fi
+
+		printf '\n[RUN]  npm run lint\n'
+		if $(NPM) run lint; then
+			pass 'Lint completed successfully'
+		else
+			fail 'Lint failed'
+		fi
+
+		printf '\n[RUN]  npm run build\n'
+		if $(NPM) run build; then
+			pass 'Production build completed successfully'
+		else
+			fail 'Production build failed'
+		fi
+	else
+		skip 'Dependency installation, lint, and build require npm'
+	fi
+
 	for release_file in $(RELEASE_FILES); do
-		if [[ ! -s "$$release_file" ]]; then
-			printf 'Error: release artifact %s is missing or empty.\n' "$$release_file" >&2
-			exit 1
+		if [[ -s "$$release_file" ]]; then
+			pass "Release artifact $$release_file is present"
+		else
+			fail "Release artifact $$release_file is missing or empty"
 		fi
 	done
 
-	printf '\nRelease checks passed for %s (%s).\n' "$$version" "$$repository"
-	printf 'Release description: %s\n\n' "$$release_notes"
-	cat "$$release_notes"
+	printf '\nRelease description\n\n'
+	if [[ -n "$$release_notes" && -s "$$release_notes" ]]; then
+		cat "$$release_notes"
+	else
+		skip 'No release description is available to display'
+	fi
+
+	printf '\nSummary: %d passed, %d failed, %d skipped.\n' "$$passes" "$$failures" "$$skips"
+	if ((failures > 0)); then
+		printf '%s\n' 'Release readiness checks failed; no release was published.' >&2
+		exit 1
+	fi
+	printf 'Release checks passed for %s (%s).\n' "$$version" "$$repository"
 
 release: release-check
 	@./make_release.sh
