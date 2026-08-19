@@ -1,5 +1,10 @@
 # Obsidian Copy Inline Code Plugin
 
+## Changes in This Fork
+
+- **No extra spacing on hover:** Enabling **Show on hover** no longer reserves space for hidden copy icons or changes line length when they appear.
+- **Clean printing and PDF export:** Copy icons are excluded from printed documents and exported PDFs.
+
 This plugin for [Obsidian](https://obsidian.md) adds a customizable icon inside each inline code, which when clicked, copies the content of the code into the clipboard. See screenshot of the functionality below.
 
 ![Screenshot of the copy inline code plugin](plugin-screenshot.png)
