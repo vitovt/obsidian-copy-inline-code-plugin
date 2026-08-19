@@ -1,6 +1,17 @@
 import CopyInlineCodePlugin from "./main";
-import { App, PluginSettingTab, Setting, getIconIds, getIcon } from "obsidian";
-import type { IconPosition } from "./icon-position";
+import {
+	App,
+	Notice,
+	PluginSettingTab,
+	Setting,
+	getIcon,
+	getIconIds,
+	type SettingDefinitionItem,
+} from "obsidian";
+import { isIconPosition } from "./icon-position";
+
+const EXCLUSION_DESCRIPTION =
+	"Add regular expressions for inline code that should not show a copy icon.";
 
 export class CopyInlineCodePluginTab extends PluginSettingTab {
 	plugin: CopyInlineCodePlugin;
@@ -10,227 +21,280 @@ export class CopyInlineCodePluginTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("Show on hover")
-			.setDesc("Copy icon only visible on hover")
-			.addToggle((component) => {
-				component
-					.setValue(this.plugin.settings.showOnHover)
-					.onChange(async (value) => {
-						this.plugin.settings.showOnHover = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		containerEl.createEl("h3", { text: "Exclusion Patterns" });
-		containerEl.createEl("p", {
-			text: "Add regex patterns to exclude code blocks from showing the copy icon. If no patterns are added, all code blocks will show the icon.",
-		});
-
-		const regexListContainer = containerEl.createDiv();
-		this.renderRegexList(regexListContainer);
-
-		new Setting(containerEl).addButton((button) => {
-			button.setButtonText("Add Exclusion Pattern").onClick(() => {
-				this.plugin.settings.regexFilters.push(["", ""]);
-				this.renderRegexList(regexListContainer);
-			});
-		});
-
-		// Icon selection setting
-		containerEl.createEl("h3", { text: "Icon Settings" });
-
-		new Setting(containerEl)
-			.setName("Icon position")
-			.setDesc("Show the copy icon on the left or right of inline code")
-			.addDropdown((component) => {
-				component
-					.addOption("right", "Right")
-					.addOption("left", "Left")
-					.setValue(this.plugin.settings.iconPosition)
-					.onChange(async (value) => {
-						this.plugin.settings.iconPosition = value as IconPosition;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		// Only show Lucide icon settings if legacy mode is disabled
-		if (!this.plugin.settings.useLegacyIcon) {
-			const iconDesc = containerEl.createDiv();
-			iconDesc.createEl("p", {
-				text: "Choose a Lucide icon for the copy button. You can browse available icons at: ",
-			});
-			const iconLink = iconDesc.createEl("a", {
-				text: "https://lucide.dev/icons/",
-				href: "https://lucide.dev/icons/",
-			});
-			iconLink.setAttribute("target", "_blank");
-
-			iconDesc.createEl("p", {
-				text: "Copy the icon name (e.g., 'copy', 'clipboard', ...) and paste it below.",
-			});
-
-			const iconSetting = new Setting(containerEl)
-				.setName("Icon name")
-				.setDesc(
-					"Lucide icon name"
-				);
-
-			// Create a container for the input and preview
-			const inputContainer = iconSetting.controlEl.createDiv({
-				cls: "icon-input-container",
-			});
-
-			// Create preview element
-			const iconPreview = inputContainer.createSpan();
-
-			// Function to update the icon preview
-			const updateIconPreview = (iconName: string) => {
-				iconPreview.empty();
-
-				let lucideIcon: SVGSVGElement | null = null;
-				let isInvalid = false;
-
-				if (!iconName) {
-					isInvalid = true;
-					lucideIcon = getIcon("lucide-x");
-				} else {
-					lucideIcon = getIcon(iconName);
-					if (!lucideIcon) {
-						isInvalid = true;
-						lucideIcon = getIcon("lucide-x");
-					}
-				}
-
-				if (lucideIcon) {
-					lucideIcon.classList.add("preview-icon");
-					if (isInvalid) {
-						lucideIcon.classList.add("invalid-preview-icon");
-					}
-					iconPreview.appendChild(lucideIcon);
-				}
-			};
-
-			// Create text input
-			const textInput = inputContainer.createEl("input", {
-				type: "text",
-				cls: "text-input",
-			});
-			textInput.style.flex = "1";
-			textInput.placeholder = "copy";
-
-			// Get the base icon name (without lucide- prefix) for display
-			const baseIconName = this.plugin.settings.iconName.startsWith(
-				"lucide-"
-			)
-				? this.plugin.settings.iconName.substring(7)
-				: this.plugin.settings.iconName;
-
-			textInput.value = baseIconName;
-
-			// Initialize preview with current icon
-			updateIconPreview(this.plugin.settings.iconName);
-
-			textInput.addEventListener("input", async (event) => {
-				const target = event.target as HTMLInputElement;
-				const value = target.value;
-				const trimmedValue = `lucide-${value.trim()}`;
-				const availableIcons = getIconIds();
-
-				// Update preview in real-time
-				updateIconPreview(trimmedValue);
-
-				// Validate icon exists
-				if (trimmedValue && !availableIcons.includes(trimmedValue)) {
-					textInput.classList.add("regex-input-error");
-					return;
-				}
-
-				textInput.classList.remove("regex-input-error");
-				this.plugin.settings.iconName = trimmedValue;
-				await this.plugin.saveSettings();
-			});
-		}
-
-		new Setting(containerEl)
-			.setName("Use legacy icon")
-			.setDesc(
-				"Use the original clipboard emoji (📋) instead of Lucide icons"
-			)
-			.addToggle((component) => {
-				component
-					.setValue(this.plugin.settings.useLegacyIcon)
-					.onChange(async (value) => {
-						this.plugin.settings.useLegacyIcon = value;
-						await this.plugin.saveSettings();
-						this.display();
-					});
-			});
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: "Show on hover",
+				desc: "Only show the copy icon while hovering over inline code.",
+				render: (setting) => this.addShowOnHoverControl(setting),
+			},
+			{
+				type: "list",
+				heading: "Exclusion patterns",
+				emptyState: "No exclusion patterns.",
+				addItem: {
+					name: "Add exclusion pattern",
+					action: () => {
+						this.plugin.settings.regexFilters.push(["", ""]);
+						this.refreshSettings();
+					},
+				},
+				onDelete: (index) => {
+					this.plugin.settings.regexFilters.splice(index, 1);
+					this.persistAndRefresh();
+				},
+				items: this.plugin.settings.regexFilters.map((regex, index) => ({
+					name: `Pattern ${index + 1}`,
+					render: (setting) => this.addRegexControls(setting, regex),
+				})),
+			},
+			{
+				type: "group",
+				heading: "Icons",
+				items: [
+					{
+						name: "Icon position",
+						desc: "Show the copy icon on the left or right of inline code.",
+						render: (setting) => this.addIconPositionControl(setting),
+					},
+					{
+						name: "Icon name",
+						desc: this.createIconDescription(),
+						visible: () => !this.plugin.settings.useLegacyIcon,
+						render: (setting) => this.addIconNameControl(setting),
+					},
+					{
+						name: "Use legacy icon",
+						desc: "Use the original clipboard emoji (📋) instead of Lucide icons.",
+						render: (setting) => this.addLegacyIconControl(setting),
+					},
+				],
+			},
+		];
 	}
 
-	private renderRegexList(container: HTMLElement) {
-		container.empty();
+	display(): void {
+		this.containerEl.empty();
+		this.renderImperativeSettings();
+	}
+
+	private renderImperativeSettings(): void {
+		this.addShowOnHoverControl(
+			new Setting(this.containerEl)
+				.setName("Show on hover")
+				.setDesc("Only show the copy icon while hovering over inline code.")
+		);
+
+		new Setting(this.containerEl)
+			.setName("Exclusion patterns")
+			.setDesc(EXCLUSION_DESCRIPTION)
+			.setHeading();
 
 		this.plugin.settings.regexFilters.forEach((regex, index) => {
-			const setting = new Setting(container);
-			setting
-				.setName(`Pattern #${index + 1}`)
-				.addText((text) => {
-					text.setValue(regex[0])
-						.setPlaceholder("regex pattern")
-						.onChange(async (value) => {
-							try {
-								new RegExp(value, "");
-							} catch {
-								text.inputEl.classList.add("regex-input-error");
-								return;
-							}
-							text.inputEl.classList.remove("regex-input-error");
-							this.plugin.settings.regexFilters[index] = [
-								value,
-								regex[1],
-							];
-							await this.plugin.saveSettings();
-						});
+			this.addRegexControls(
+				new Setting(this.containerEl).setName(`Pattern ${index + 1}`),
+				regex,
+				() => {
+					this.plugin.settings.regexFilters.splice(index, 1);
+					this.persistAndRefresh();
+				}
+			);
+		});
 
-					const textEl = text.inputEl;
-					textEl.style.width = "80%";
-				})
-				.addText((text) => {
-					text.setValue(regex[1])
-						.setPlaceholder("modifiers")
-						.onChange(async (value) => {
-							try {
-								new RegExp("", value);
-							} catch {
-								text.inputEl.classList.add("regex-input-error");
-								return;
-							}
-							text.inputEl.classList.remove("regex-input-error");
-							this.plugin.settings.regexFilters[index] = [
-								regex[0],
-								value,
-							];
-							await this.plugin.saveSettings();
-						});
-					const textEl = text.inputEl;
-					textEl.style.width = "20%";
-				})
-				.addButton((button) => {
-					button
-						.setIcon("trash")
-						.setClass("mod-warning")
-						.onClick(async () => {
-							this.plugin.settings.regexFilters.splice(index, 1);
-							await this.plugin.saveSettings();
-							this.renderRegexList(container);
-						});
+		new Setting(this.containerEl)
+			.setName("Add exclusion pattern")
+			.addButton((button) => {
+				button.setButtonText("Add").onClick(() => {
+					this.plugin.settings.regexFilters.push(["", ""]);
+					this.refreshSettings();
+				});
+			});
+
+		new Setting(this.containerEl).setName("Icons").setHeading();
+
+		this.addIconPositionControl(
+			new Setting(this.containerEl)
+				.setName("Icon position")
+				.setDesc("Show the copy icon on the left or right of inline code.")
+		);
+
+		if (!this.plugin.settings.useLegacyIcon) {
+			this.addIconNameControl(
+				new Setting(this.containerEl)
+					.setName("Icon name")
+					.setDesc(this.createIconDescription())
+			);
+		}
+
+		this.addLegacyIconControl(
+			new Setting(this.containerEl)
+				.setName("Use legacy icon")
+				.setDesc(
+					"Use the original clipboard emoji (📋) instead of Lucide icons."
+				)
+		);
+	}
+
+	private addShowOnHoverControl(setting: Setting): void {
+		setting.addToggle((component) => {
+			component
+				.setValue(this.plugin.settings.showOnHover)
+				.onChange(async (value) => {
+					this.plugin.settings.showOnHover = value;
+					await this.plugin.saveSettings();
 				});
 		});
+	}
+
+	private addIconPositionControl(setting: Setting): void {
+		setting.addDropdown((component) => {
+			component
+				.addOption("right", "Right")
+				.addOption("left", "Left")
+				.setValue(this.plugin.settings.iconPosition)
+				.onChange(async (value) => {
+					if (!isIconPosition(value)) {
+						return;
+					}
+					this.plugin.settings.iconPosition = value;
+					await this.plugin.saveSettings();
+				});
+		});
+	}
+
+	private addIconNameControl(setting: Setting): void {
+		setting.controlEl.addClass("icon-input-container");
+		const iconPreview = setting.controlEl.createSpan();
+		const baseIconName = this.plugin.settings.iconName.startsWith("lucide-")
+			? this.plugin.settings.iconName.substring(7)
+			: this.plugin.settings.iconName;
+
+		this.updateIconPreview(iconPreview, this.plugin.settings.iconName);
+
+		setting.addText((text) => {
+			text.setValue(baseIconName)
+				.setPlaceholder("Copy")
+				.onChange(async (value) => {
+					const iconName = `lucide-${value.trim()}`;
+					this.updateIconPreview(iconPreview, iconName);
+
+					if (!getIconIds().includes(iconName)) {
+						text.inputEl.addClass("regex-input-error");
+						return;
+					}
+
+					text.inputEl.removeClass("regex-input-error");
+					this.plugin.settings.iconName = iconName;
+					await this.plugin.saveSettings();
+				});
+			text.inputEl.addClass("icon-name-input");
+		});
+	}
+
+	private addLegacyIconControl(setting: Setting): void {
+		setting.addToggle((component) => {
+			component
+				.setValue(this.plugin.settings.useLegacyIcon)
+				.onChange(async (value) => {
+					this.plugin.settings.useLegacyIcon = value;
+					await this.plugin.saveSettings();
+					this.refreshSettings();
+				});
+		});
+	}
+
+	private addRegexControls(
+		setting: Setting,
+		regex: [string, string],
+		onDelete?: () => void
+	): void {
+		setting
+			.addText((text) => {
+				text.setValue(regex[0])
+					.setPlaceholder("Regex pattern")
+					.onChange(async (value) => {
+						if (!this.isValidRegex(value, regex[1])) {
+							text.inputEl.addClass("regex-input-error");
+							return;
+						}
+						text.inputEl.removeClass("regex-input-error");
+						regex[0] = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.addClass("regex-pattern-input");
+			})
+			.addText((text) => {
+				text.setValue(regex[1])
+					.setPlaceholder("Modifiers")
+					.onChange(async (value) => {
+						if (!this.isValidRegex(regex[0], value)) {
+							text.inputEl.addClass("regex-input-error");
+							return;
+						}
+						text.inputEl.removeClass("regex-input-error");
+						regex[1] = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.addClass("regex-modifier-input");
+			});
+
+		if (onDelete) {
+			setting.addButton((button) => {
+				button.setButtonText("Remove").onClick(onDelete);
+			});
+		}
+	}
+
+	private updateIconPreview(container: HTMLElement, iconName: string): void {
+		container.empty();
+		const selectedIcon = getIcon(iconName);
+		const icon = selectedIcon ?? getIcon("lucide-x");
+		if (!icon) {
+			return;
+		}
+
+		icon.addClass("preview-icon");
+		if (!selectedIcon) {
+			icon.addClass("invalid-preview-icon");
+		}
+		container.appendChild(icon);
+	}
+
+	private createIconDescription(): DocumentFragment {
+		const description = createFragment();
+		description.appendText("Choose an icon from the ");
+		description.createEl("a", {
+			text: "Lucide icon gallery",
+			href: "https://lucide.dev/icons/",
+		});
+		description.appendText(" and enter its name.");
+		return description;
+	}
+
+	private isValidRegex(pattern: string, flags: string): boolean {
+		try {
+			new RegExp(pattern, flags);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	private persistAndRefresh(): void {
+		void this.plugin.saveSettings().then(
+			() => this.refreshSettings(),
+			() => new Notice("Could not save the plugin settings.")
+		);
+	}
+
+	private refreshSettings(): void {
+		const update = (this as { update?: () => void }).update;
+		if (typeof update === "function") {
+			update.call(this);
+			return;
+		}
+
+		this.containerEl.empty();
+		this.renderImperativeSettings();
 	}
 }

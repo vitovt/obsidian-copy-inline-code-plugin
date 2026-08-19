@@ -81,6 +81,18 @@ code:hover .show-on-hover {
 	gap: 10px;
 }
 
+.icon-name-input {
+	flex: 1;
+}
+
+.regex-pattern-input {
+	width: 80%;
+}
+
+.regex-modifier-input {
+	width: 20%;
+}
+
 .preview-icon {
 	color: var(--text-normal);
 	display: flex;
