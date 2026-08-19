@@ -48,6 +48,11 @@ You can follow the same procedure to update the plugin
 ## Development
 
 - Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+- Install Node.js 20 LTS or newer (the minimum supported version is 18.18).
+- Run `npm ci` to install the exact versions in `package-lock.json`.
+- Run `make dev` to compile continuously while developing.
+- Run `make localbuild` to create a copy-ready plugin directory under `local-build/`.
+
+Before committing, run `make check` to lint the TypeScript and plugin manifest and
+to produce a strict production build. Dependency and install-script checks are
+available through `npm audit --audit-level=low` and `npm install-scripts ls`.
