@@ -5,6 +5,7 @@
 - **No extra spacing on hover:** Enabling **Show on hover** no longer reserves space for hidden copy icons or changes line length or line height when they appear.
 - **Clean printing and PDF export:** Copy icons are excluded from printed documents and exported PDFs.
 - **Immediate settings:** Plugin settings apply to open editor and Reading Mode views without restarting Obsidian.
+- **Configurable icon position:** Show either the Lucide or legacy copy icon on the right (default) or left in permanent and hover modes.
 
 > It was created because original plugin has a lot of opened issues and **author doesn't respond**.
 
