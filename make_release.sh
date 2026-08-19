@@ -71,8 +71,48 @@ resolve_manifest_version() {
   return 1
 }
 
+resolve_github_repository() {
+  local remote_url=""
+  local repository=""
+
+  if [[ -n "${GH_REPO:-}" ]]; then
+    printf '%s\n' "$GH_REPO"
+    return 0
+  fi
+
+  remote_url="$(git remote get-url origin 2>/dev/null)" || return 1
+
+  case "$remote_url" in
+    git@github.com:*)
+      repository="${remote_url#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      repository="${remote_url#ssh://git@github.com/}"
+      ;;
+    https://github.com/*)
+      repository="${remote_url#https://github.com/}"
+      ;;
+    http://github.com/*)
+      repository="${remote_url#http://github.com/}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  repository="${repository%.git}"
+  [[ "$repository" =~ ^[^/]+/[^/]+$ ]] || return 1
+  printf '%s\n' "$repository"
+}
+
 version="$(resolve_manifest_version)" || {
   echo "Error: could not read a valid version from manifest.json with sed, jq, python3, or node." >&2
+  exit 1
+}
+
+repository="$(resolve_github_repository)" || {
+  echo "Error: could not determine the GitHub repository from the 'origin' remote." >&2
+  echo "Set GH_REPO to 'owner/repository' and run the script again." >&2
   exit 1
 }
 
@@ -100,11 +140,7 @@ if ! printf '%s\n' "$head_tags" | grep -Fx "$version" >/dev/null 2>&1; then
   exit 1
 fi
 
-cat >&2 <<'EOF'
-Warning: this local release helper cannot create GitHub artifact attestations.
-For Obsidian community submission, prefer pushing the matching tag and letting
-.github/workflows/release.yml build, attest, and publish the release assets.
-EOF
+echo "Creating GitHub release '$version' in '$repository'..."
 
 gh release create "$version" \
   manifest.json \
@@ -112,4 +148,5 @@ gh release create "$version" \
   styles.css \
   --verify-tag \
   --generate-notes \
-  --title "$version"
+  --title "$version" \
+  --repo "$repository"
