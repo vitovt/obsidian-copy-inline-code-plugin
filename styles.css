@@ -56,11 +56,6 @@ code:hover .show-on-hover {
 	}
 }
 
-.tasks-setting-important {
-	color: red;
-	font-weight: bold;
-}
-
 .regex-input-error {
 	border-color: var(--text-error) !important;
 }

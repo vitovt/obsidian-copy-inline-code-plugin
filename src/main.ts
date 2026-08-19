@@ -1,5 +1,6 @@
 import { CopyInlineCodePluginTab } from "./settings";
-import { Notice, Plugin, getIcon } from "obsidian";
+import { MarkdownView, Notice, Plugin, getIcon } from "obsidian";
+import { Extension } from "@codemirror/state";
 import { createCopyPlugin } from "./copy-inline-code-view-plugin";
 import { RegexFilters, shouldExclude } from "./regex-exclude";
 
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS: Partial<CopyInlineCodePluginSettings> = {
 
 export default class CopyInlineCodePlugin extends Plugin {
 	settings: CopyInlineCodePluginSettings;
+	private editorExtensions: Extension[] = [];
 
 	async onload() {
 		await this.loadSettings();
@@ -36,17 +38,40 @@ export default class CopyInlineCodePlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.applySettings();
 	}
 
-	async copyInlineCodeLogic() {
-		this.registerEditorExtension([
-			createCopyPlugin(
-				this.settings.showOnHover,
-				this.settings.regexFilters,
-				this.settings.iconName,
-				this.settings.useLegacyIcon
-			),
-		]);
+	private createEditorExtension(): Extension {
+		return createCopyPlugin(
+			this.settings.showOnHover,
+			this.settings.regexFilters,
+			this.settings.iconName,
+			this.settings.useLegacyIcon
+		);
+	}
+
+	private applySettings() {
+		if (this.editorExtensions.length === 0) {
+			return;
+		}
+
+		this.editorExtensions.splice(
+			0,
+			this.editorExtensions.length,
+			this.createEditorExtension()
+		);
+		this.app.workspace.updateOptions();
+
+		this.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
+			if (leaf.view instanceof MarkdownView && leaf.view.getMode() === "preview") {
+				leaf.view.previewMode.rerender(true);
+			}
+		});
+	}
+
+	copyInlineCodeLogic() {
+		this.editorExtensions.push(this.createEditorExtension());
+		this.registerEditorExtension(this.editorExtensions);
 		this.registerMarkdownPostProcessor((element, context) => {
 			const inlineCodes = element.querySelectorAll("*:not(pre) > code");
 

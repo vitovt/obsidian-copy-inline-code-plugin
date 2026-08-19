@@ -13,16 +13,10 @@ export class CopyInlineCodePluginTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-		containerEl.createEl("p", {
-			cls: "tasks-setting-important",
-			text: "Changing any settings requires a restart of obsidian or use of the 'Reload app without saving' command.",
-		});
 
 		new Setting(containerEl)
 			.setName("Show on hover")
-			.setDesc(
-				"Copy icon only visible on hover (restart obsidian after change)"
-			)
+			.setDesc("Copy icon only visible on hover")
 			.addToggle((component) => {
 				component
 					.setValue(this.plugin.settings.showOnHover)
