@@ -1,5 +1,6 @@
 import CopyInlineCodePlugin from "./main";
 import { App, PluginSettingTab, Setting, getIconIds, getIcon } from "obsidian";
+import type { IconPosition } from "./icon-position";
 
 export class CopyInlineCodePluginTab extends PluginSettingTab {
 	plugin: CopyInlineCodePlugin;
@@ -43,6 +44,20 @@ export class CopyInlineCodePluginTab extends PluginSettingTab {
 
 		// Icon selection setting
 		containerEl.createEl("h3", { text: "Icon Settings" });
+
+		new Setting(containerEl)
+			.setName("Icon position")
+			.setDesc("Show the copy icon on the left or right of inline code")
+			.addDropdown((component) => {
+				component
+					.addOption("right", "Right")
+					.addOption("left", "Left")
+					.setValue(this.plugin.settings.iconPosition)
+					.onChange(async (value) => {
+						this.plugin.settings.iconPosition = value as IconPosition;
+						await this.plugin.saveSettings();
+					});
+			});
 
 		// Only show Lucide icon settings if legacy mode is disabled
 		if (!this.plugin.settings.useLegacyIcon) {

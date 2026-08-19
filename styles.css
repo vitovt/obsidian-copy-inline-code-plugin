@@ -7,8 +7,12 @@
 	pointer-events: none;
 }
 
-.icon-margin-left {
-	margin-left: 0.25em;
+.icon-position-right:not(.show-on-hover) {
+	margin-inline-start: 0.25em;
+}
+
+.icon-position-left:not(.show-on-hover) {
+	margin-inline-end: 0.25em;
 }
 
 .show-on-hover {
@@ -28,12 +32,22 @@
 	pointer-events: none;
 }
 
-.show-on-hover > svg {
+.show-on-hover > svg,
+.show-on-hover > .copy-to-clipboard-legacy-icon {
 	position: absolute;
-	inset-inline-end: 0;
 	bottom: -0.15em;
 	background-color: var(--code-background);
 	pointer-events: auto;
+}
+
+.show-on-hover.icon-position-right > svg,
+.show-on-hover.icon-position-right > .copy-to-clipboard-legacy-icon {
+	inset-inline-end: 0;
+}
+
+.show-on-hover.icon-position-left > svg,
+.show-on-hover.icon-position-left > .copy-to-clipboard-legacy-icon {
+	inset-inline-start: 0;
 }
 
 /* Source Mode */

@@ -2,6 +2,7 @@ import { CopyInlineCodePluginTab } from "./settings";
 import { MarkdownView, Notice, Plugin, getIcon } from "obsidian";
 import { Extension } from "@codemirror/state";
 import { createCopyPlugin } from "./copy-inline-code-view-plugin";
+import type { IconPosition } from "./icon-position";
 import { RegexFilters, shouldExclude } from "./regex-exclude";
 
 interface CopyInlineCodePluginSettings {
@@ -9,6 +10,7 @@ interface CopyInlineCodePluginSettings {
 	regexFilters: RegexFilters;
 	iconName: string;
 	useLegacyIcon: boolean;
+	iconPosition: IconPosition;
 }
 
 const DEFAULT_SETTINGS: Partial<CopyInlineCodePluginSettings> = {
@@ -16,6 +18,7 @@ const DEFAULT_SETTINGS: Partial<CopyInlineCodePluginSettings> = {
 	regexFilters: [],
 	iconName: "lucide-copy",
 	useLegacyIcon: false,
+	iconPosition: "right",
 };
 
 export default class CopyInlineCodePlugin extends Plugin {
@@ -46,7 +49,8 @@ export default class CopyInlineCodePlugin extends Plugin {
 			this.settings.showOnHover,
 			this.settings.regexFilters,
 			this.settings.iconName,
-			this.settings.useLegacyIcon
+			this.settings.useLegacyIcon,
+			this.settings.iconPosition
 		);
 	}
 
@@ -90,17 +94,23 @@ export default class CopyInlineCodePlugin extends Plugin {
 				}
 
 				const icon = createSpan({
-					cls: "copy-to-clipboard-icon icon-margin-left",
+					cls: `copy-to-clipboard-icon icon-position-${this.settings.iconPosition}`,
 				});
 
 				if (this.settings.useLegacyIcon) {
-					icon.setText("\xa0📋");
+					icon.createSpan({
+						cls: "copy-to-clipboard-legacy-icon",
+						text: "📋",
+					});
 				} else {
 					const lucideIcon = getIcon(this.settings.iconName);
 					if (lucideIcon) {
 						icon.appendChild(lucideIcon);
 					} else {
-						icon.setText("\xa0📋");
+						icon.createSpan({
+							cls: "copy-to-clipboard-legacy-icon",
+							text: "📋",
+						});
 					}
 				}
 
@@ -114,7 +124,11 @@ export default class CopyInlineCodePlugin extends Plugin {
 					}
 				};
 
-				code.appendChild(icon);
+				if (this.settings.iconPosition === "left") {
+					code.prepend(icon);
+				} else {
+					code.appendChild(icon);
+				}
 			});
 		});
 	}
