@@ -46,6 +46,13 @@ code:hover .show-on-hover {
 	pointer-events: auto;
 }
 
+/* Obsidian uses print media styles when exporting a note to PDF. */
+@media print {
+	.copy-to-clipboard-icon {
+		display: none !important;
+	}
+}
+
 .tasks-setting-important {
 	color: red;
 	font-weight: bold;
