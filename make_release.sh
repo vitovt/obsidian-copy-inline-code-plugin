@@ -116,6 +116,12 @@ repository="$(resolve_github_repository)" || {
   exit 1
 }
 
+release_notes="release-notes/$version.md"
+if [[ ! -s "$release_notes" ]]; then
+  echo "Error: release description '$release_notes' is missing or empty." >&2
+  exit 1
+fi
+
 npm ci
 npm run lint
 npm run build
@@ -147,6 +153,6 @@ gh release create "$version" \
   main.js \
   styles.css \
   --verify-tag \
-  --generate-notes \
+  --notes-file "$release_notes" \
   --title "$version" \
   --repo "$repository"
