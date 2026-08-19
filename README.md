@@ -4,6 +4,7 @@
 
 - **No extra spacing on hover:** Enabling **Show on hover** no longer reserves space for hidden copy icons or changes line length or line height when they appear.
 - **Clean printing and PDF export:** Copy icons are excluded from printed documents and exported PDFs.
+- **Immediate settings:** Plugin settings apply to open editor and Reading Mode views without restarting Obsidian.
 
 This plugin for [Obsidian](https://obsidian.md) adds a customizable icon inside each inline code, which when clicked, copies the content of the code into the clipboard. See screenshot of the functionality below.
 
