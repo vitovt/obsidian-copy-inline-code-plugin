@@ -1,12 +1,26 @@
 export type RegexFilters = [string, string][];
 
-export function shouldExclude(text: string, regexFilters: RegexFilters) {
-	return (regexFilters || []).some((pattern) => {
+export function isRegexFilters(value: unknown): value is RegexFilters {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(filter) =>
+				Array.isArray(filter) &&
+				typeof filter[0] === "string" &&
+				typeof filter[1] === "string"
+		)
+	);
+}
+
+export function shouldExclude(
+	text: string,
+	regexFilters: RegexFilters
+): boolean {
+	return regexFilters.some(([pattern, flags]) => {
 		try {
-			const regex = new RegExp(pattern[0], pattern[1]);
+			const regex = new RegExp(pattern, flags);
 			return regex.test(text);
-		} catch (e) {
-			console.error(`Invalid regex pattern: ${pattern}`);
+		} catch {
 			return false;
 		}
 	});

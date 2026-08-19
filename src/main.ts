@@ -1,9 +1,15 @@
 import { CopyInlineCodePluginTab } from "./settings";
-import { MarkdownView, Notice, Plugin, getIcon } from "obsidian";
+import { MarkdownView, Plugin } from "obsidian";
 import { Extension } from "@codemirror/state";
+import { copyTextToClipboard } from "./clipboard";
+import { createCopyIcon } from "./copy-icon";
 import { createCopyPlugin } from "./copy-inline-code-view-plugin";
-import type { IconPosition } from "./icon-position";
-import { RegexFilters, shouldExclude } from "./regex-exclude";
+import { isIconPosition, type IconPosition } from "./icon-position";
+import {
+	isRegexFilters,
+	type RegexFilters,
+	shouldExclude,
+} from "./regex-exclude";
 
 interface CopyInlineCodePluginSettings {
 	showOnHover: boolean;
@@ -13,7 +19,7 @@ interface CopyInlineCodePluginSettings {
 	iconPosition: IconPosition;
 }
 
-const DEFAULT_SETTINGS: Partial<CopyInlineCodePluginSettings> = {
+const DEFAULT_SETTINGS: CopyInlineCodePluginSettings = {
 	showOnHover: false,
 	regexFilters: [],
 	iconName: "lucide-copy",
@@ -22,24 +28,45 @@ const DEFAULT_SETTINGS: Partial<CopyInlineCodePluginSettings> = {
 };
 
 export default class CopyInlineCodePlugin extends Plugin {
-	settings: CopyInlineCodePluginSettings;
+	settings!: CopyInlineCodePluginSettings;
 	private editorExtensions: Extension[] = [];
 
-	async onload() {
+	async onload(): Promise<void> {
 		await this.loadSettings();
 		this.addSettingTab(new CopyInlineCodePluginTab(this.app, this));
 		this.copyInlineCodeLogic();
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData()
-		);
+	async loadSettings(): Promise<void> {
+		const savedData: unknown = await this.loadData();
+		const savedSettings =
+			typeof savedData === "object" && savedData !== null
+				? (savedData as Record<string, unknown>)
+				: {};
+
+		this.settings = {
+			showOnHover:
+				typeof savedSettings.showOnHover === "boolean"
+					? savedSettings.showOnHover
+					: DEFAULT_SETTINGS.showOnHover,
+			regexFilters: isRegexFilters(savedSettings.regexFilters)
+				? savedSettings.regexFilters
+				: DEFAULT_SETTINGS.regexFilters,
+			iconName:
+				typeof savedSettings.iconName === "string"
+					? savedSettings.iconName
+					: DEFAULT_SETTINGS.iconName,
+			useLegacyIcon:
+				typeof savedSettings.useLegacyIcon === "boolean"
+					? savedSettings.useLegacyIcon
+					: DEFAULT_SETTINGS.useLegacyIcon,
+			iconPosition: isIconPosition(savedSettings.iconPosition)
+				? savedSettings.iconPosition
+				: DEFAULT_SETTINGS.iconPosition,
+		};
 	}
 
-	async saveSettings() {
+	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 		this.applySettings();
 	}
@@ -54,7 +81,7 @@ export default class CopyInlineCodePlugin extends Plugin {
 		);
 	}
 
-	private applySettings() {
+	private applySettings(): void {
 		if (this.editorExtensions.length === 0) {
 			return;
 		}
@@ -73,7 +100,7 @@ export default class CopyInlineCodePlugin extends Plugin {
 		});
 	}
 
-	copyInlineCodeLogic() {
+	copyInlineCodeLogic(): void {
 		this.editorExtensions.push(this.createEditorExtension());
 		this.registerEditorExtension(this.editorExtensions);
 		this.registerMarkdownPostProcessor((element, context) => {
@@ -93,35 +120,16 @@ export default class CopyInlineCodePlugin extends Plugin {
 					return;
 				}
 
-				const icon = createSpan({
-					cls: `copy-to-clipboard-icon icon-position-${this.settings.iconPosition}`,
+				const icon = createCopyIcon({
+					showOnHover: this.settings.showOnHover,
+					iconName: this.settings.iconName,
+					useLegacyIcon: this.settings.useLegacyIcon,
+					iconPosition: this.settings.iconPosition,
 				});
 
-				if (this.settings.useLegacyIcon) {
-					icon.createSpan({
-						cls: "copy-to-clipboard-legacy-icon",
-						text: "📋",
-					});
-				} else {
-					const lucideIcon = getIcon(this.settings.iconName);
-					if (lucideIcon) {
-						icon.appendChild(lucideIcon);
-					} else {
-						icon.createSpan({
-							cls: "copy-to-clipboard-legacy-icon",
-							text: "📋",
-						});
-					}
-				}
-
-				icon.toggleClass("show-on-hover", this.settings.showOnHover);
-
 				icon.onclick = (event) => {
-					if (textToCopy) {
-						event.stopPropagation();
-						navigator.clipboard.writeText(textToCopy);
-						new Notice(`Copied '${textToCopy}' to clipboard!`);
-					}
+					event.stopPropagation();
+					copyTextToClipboard(textToCopy);
 				};
 
 				if (this.settings.iconPosition === "left") {

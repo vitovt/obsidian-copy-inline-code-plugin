@@ -10,29 +10,19 @@ import {
 } from "@codemirror/view";
 import { CopyWidget } from "./copy-code-widget";
 import type { IconPosition } from "./icon-position";
-import { RegexFilters, shouldExclude } from "./regex-exclude";
+import { shouldExclude } from "./regex-exclude";
+import type { RegexFilters } from "./regex-exclude";
 
 class CopyInlineCodeViewPlugin implements PluginValue {
 	decorations: DecorationSet;
-	showOnHover: boolean;
-	filters: RegexFilters;
-	iconName: string;
-	useLegacyIcon: boolean;
-	iconPosition: IconPosition;
 	constructor(
 		view: EditorView,
-		showOnHover: boolean,
-		filters: RegexFilters,
-		iconName: string,
-		useLegacyIcon: boolean,
-		iconPosition: IconPosition
+		private readonly showOnHover: boolean,
+		private readonly filters: RegexFilters,
+		private readonly iconName: string,
+		private readonly useLegacyIcon: boolean,
+		private readonly iconPosition: IconPosition
 	) {
-		this.showOnHover = showOnHover;
-		this.filters = filters;
-		this.iconName = iconName;
-		this.useLegacyIcon = useLegacyIcon;
-		this.iconPosition = iconPosition;
-
 		this.decorations = this.buildDecorations(view);
 	}
 
@@ -42,9 +32,7 @@ class CopyInlineCodeViewPlugin implements PluginValue {
 		}
 	}
 
-	destroy() {}
-
-	buildDecorations(view: EditorView): DecorationSet {
+	private buildDecorations(view: EditorView): DecorationSet {
 		const builder = new RangeSetBuilder<Decoration>();
 		const showOnHover = this.showOnHover;
 		const filters = this.filters;
