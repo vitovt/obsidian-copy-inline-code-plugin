@@ -1,5 +1,7 @@
 > This repository is an **improved COPY** of the original plugin with the following improvements:
 
+[![Plugin demo](plugin-video.gif)](plugin-video.mp4)
+
 ## Changes in This Fork
 
 - **No extra spacing on hover:** Enabling **Show on hover** no longer reserves space for hidden copy icons or changes line length or line height when they appear.
