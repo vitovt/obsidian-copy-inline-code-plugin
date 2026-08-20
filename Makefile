@@ -88,6 +88,7 @@ release-check:
 	release_notes=''
 	head_commit=''
 	repository=''
+	origin_uses_ssh=false
 	pass() {
 		passes=$$((passes + 1))
 		printf '[OK]   %s\n' "$$1"
@@ -247,8 +248,14 @@ release-check:
 
 		if origin_url="$$(git remote get-url origin 2>/dev/null)"; then
 			case "$$origin_url" in
-				git@github.com:*) repository="$${origin_url#git@github.com:}" ;;
-				ssh://git@github.com/*) repository="$${origin_url#ssh://git@github.com/}" ;;
+				git@github.com:*)
+					repository="$${origin_url#git@github.com:}"
+					origin_uses_ssh=true
+					;;
+				ssh://git@github.com/*)
+					repository="$${origin_url#ssh://git@github.com/}"
+					origin_uses_ssh=true
+					;;
 				https://github.com/*) repository="$${origin_url#https://github.com/}" ;;
 				http://github.com/*) repository="$${origin_url#http://github.com/}" ;;
 				*) repository='' ;;
@@ -278,9 +285,23 @@ release-check:
 		skip 'GitHub authentication check requires gh'
 	fi
 
+	remote_refs_output=''
+	remote_refs_query_ok=false
 	if $$have_git && [[ -n "$$head_commit" ]]; then
-		if remote_main_output="$$(git ls-remote origin refs/heads/main 2>/dev/null)"; then
-			remote_main="$$(awk 'NR == 1 { print $$1 }' <<<"$$remote_main_output")"
+		remote_refs=(refs/heads/main)
+		if [[ -n "$$version" ]]; then
+			remote_refs+=("refs/tags/$$version" "refs/tags/$$version^{}")
+		fi
+		if $$origin_uses_ssh; then
+			if [[ -n "$$version" ]]; then
+				printf '\n[AUTH] Git is contacting origin over SSH to verify that origin/main and remote tag %s point to HEAD. Your SSH key passphrase may now be requested.\n' "$$version" >&2
+			else
+				printf '\n[AUTH] Git is contacting origin over SSH to verify that origin/main points to HEAD. Your SSH key passphrase may now be requested.\n' >&2
+			fi
+		fi
+		if remote_refs_output="$$(git ls-remote origin "$${remote_refs[@]}" 2>/dev/null)"; then
+			remote_refs_query_ok=true
+			remote_main="$$(awk -v ref='refs/heads/main' '$$2 == ref { print $$1; exit }' <<<"$$remote_refs_output")"
 			if [[ "$$remote_main" == "$$head_commit" ]]; then
 				pass 'origin/main points to HEAD'
 			else
@@ -294,26 +315,18 @@ release-check:
 	fi
 
 	if $$have_git && [[ -n "$$version" && -n "$$head_commit" ]]; then
-		remote_tag=''
-		remote_tag_query_ok=true
-		if remote_tag_output="$$(git ls-remote origin "refs/tags/$$version^{}" 2>/dev/null)"; then
-			remote_tag="$$(awk 'NR == 1 { print $$1 }' <<<"$$remote_tag_output")"
-		else
-			remote_tag_query_ok=false
-		fi
-		if [[ -z "$$remote_tag" ]]; then
-			if remote_tag_output="$$(git ls-remote origin "refs/tags/$$version" 2>/dev/null)"; then
-				remote_tag="$$(awk 'NR == 1 { print $$1 }' <<<"$$remote_tag_output")"
-			else
-				remote_tag_query_ok=false
-			fi
-		fi
-		if ! $$remote_tag_query_ok; then
+		if ! $$remote_refs_query_ok; then
 			fail "Could not query remote tag $$version"
-		elif [[ "$$remote_tag" == "$$head_commit" ]]; then
-			pass "Remote tag $$version points to HEAD"
 		else
-			fail "Remote tag $$version does not point to HEAD $$head_commit"
+			remote_tag="$$(awk -v ref="refs/tags/$$version^{}" '$$2 == ref { print $$1; exit }' <<<"$$remote_refs_output")"
+			if [[ -z "$$remote_tag" ]]; then
+				remote_tag="$$(awk -v ref="refs/tags/$$version" '$$2 == ref { print $$1; exit }' <<<"$$remote_refs_output")"
+			fi
+			if [[ "$$remote_tag" == "$$head_commit" ]]; then
+				pass "Remote tag $$version points to HEAD"
+			else
+				fail "Remote tag $$version does not point to HEAD $$head_commit"
+			fi
 		fi
 	else
 		skip 'Remote tag check requires git, a plugin version, and a HEAD commit'
