@@ -6,10 +6,12 @@
 - **Clean printing and PDF export:** Copy icons are excluded from printed documents and exported PDFs.
 - **Immediate settings:** Plugin settings apply to open editor and Reading Mode views without restarting Obsidian.
 - **Configurable icon position:** Show either the Lucide or legacy copy icon on the right (default) or left in permanent and hover modes.
+- **Reliable clipboard feedback:** Success is reported only after the clipboard write completes, and failures display an error notice.
+- **Maintained development tooling:** Strict TypeScript and Obsidian-specific lint checks help prevent regressions, and the dependency tree is kept free of known audit vulnerabilities.
 
-> It was created because original plugin has a lot of opened issues and **author doesn't respond**.
+> It was created because the original plugin has several open issues and **the author has not responded**.
 
-## 🔌 Installation via BRAT
+## Installation via BRAT
 
 You can install the latest beta version of this plugin using [Obsidian BRAT Plugin](https://community.obsidian.md/plugins/obsidian42-brat):
 
@@ -27,23 +29,24 @@ This plugin for [Obsidian](https://obsidian.md) adds a customizable icon inside 
 ![Screenshot of the copy inline code plugin](plugin-screenshot.png)
 
 ## Installation
-### Using built-in Obsidian plugin installer
-From Obsidian v0.9.8, you can activate this plugin within Obsidian by doing the following:
 
-- Open Settings > Third-party plugin
-- Make sure Safe mode is off
-- Click Browse community plugins
+### Using the built-in Obsidian plugin installer
+
+The Community Plugins directory installs the original upstream plugin, not the changes from this fork:
+
+- Open **Settings → Community plugins**.
+- Click **Browse**.
 - Search for "Copy Inline Code"
-- Click Install
-- Once installed, close the community plugins window and activate the newly installed plugin
+- Click **Install**, and then click **Enable**.
 
 ### Installing manually
 
-- Download `main.js`, `styles.css`, `manifest.json` from the latest release
-- Copy the files to your vault `[valut-folder]/.obsidian/plugins/copy-inline-code-plugin/`.
+- Download `main.js`, `styles.css`, and `manifest.json` from the latest release.
+- Copy the files to `[vault-folder]/.obsidian/plugins/copy-inline-code/`.
 
 ### Updates
-You can follow the same procedure to update the plugin
+
+Follow the same installation procedure to update the plugin.
 
 ## Development
 
